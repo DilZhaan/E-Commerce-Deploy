@@ -1,0 +1,95 @@
+# Repository directories
+E-Commerce-Sys-BackEnd-MERN/
+E-Commerce-Sys-FrontEnd-MERN/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Docker
+.docker/
+docker-volumes/
+backend_uploads/
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# IDE - JetBrains
+.idea/
+*.iml
+*.iws
+.idea_modules/
+
+# System Files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Build outputs
+dist/
+build/
+**/dist/
+**/build/
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+temp/
+
+# Test coverage
+coverage/
+
+# Local development overrides
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.cer
+*.der
+*.priv
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Local MongoDB data
+data/db/
+mongodb/
+
+# Uploads and media
+uploads/
+media/
+public/uploads/
+
+# Cache directories
+.cache/
+.npm/
+.yarn/
