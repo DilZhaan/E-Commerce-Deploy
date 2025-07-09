@@ -61,27 +61,35 @@ jobs:
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           BACKEND_URL: ${{ secrets.BACKEND_URL }}
 
-      - name: Setup remote environment
+      - name: Fix Docker permissions on VM
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.AZURE_VM_IP }}
           username: ${{ secrets.AZURE_VM_USERNAME }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
-            # Create deployment directory
-            mkdir -p ~/ecommerce-deploy
+            # Stop Docker
+            sudo systemctl stop docker
             
-            # Fix Docker permissions
-            if ! getent group docker > /dev/null 2>&1; then
-              sudo groupadd docker
-            fi
+            # Remove existing Docker group and recreate it
+            sudo groupdel docker || true
+            sudo groupadd docker
+            
+            # Add current user to Docker group
             sudo usermod -aG docker $USER
-            sudo chown root:docker /var/run/docker.sock
+            
+            # Reset Docker socket permissions
+            sudo rm -rf /var/run/docker.sock
+            sudo systemctl start docker
             sudo chmod 666 /var/run/docker.sock
             
-            # Clear existing files
-            rm -f ~/ecommerce-deploy/.env
-            rm -f ~/ecommerce-deploy/docker-compose.yml
+            # Verify permissions
+            ls -l /var/run/docker.sock
+            groups $USER
+            
+            # Create deployment directory
+            mkdir -p ~/ecommerce-deploy
+            sudo chown -R $USER:$USER ~/ecommerce-deploy
 
       - name: Copy deployment files
         run: |
@@ -94,29 +102,27 @@ jobs:
           username: ${{ secrets.AZURE_VM_USERNAME }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
-            # Set proper permissions
-            sudo chown -R $USER:$USER ~/ecommerce-deploy
-            sudo chmod 644 ~/ecommerce-deploy/.env
-            sudo chmod 644 ~/ecommerce-deploy/docker-compose.yml
+            # Reconnect to get new group membership
+            newgrp docker << 'EONG'
             
-            # Ensure Docker socket permissions
-            sudo chmod 666 /var/run/docker.sock
-            
-            # Change to deployment directory
             cd ~/ecommerce-deploy
+            
+            # Login to Docker Hub
+            echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u dilzhan --password-stdin
+            
+            # Pull images first
+            docker-compose pull
             
             # Stop and remove existing containers
             docker-compose down --remove-orphans || true
             
-            # Remove unused Docker resources
+            # Clean up unused resources
             docker system prune -af --volumes --force || true
             
-            # Pull and start containers
-            docker login -u dilzhan
-            docker-compose pull
+            # Start services
             docker-compose up -d
             
-            # Show deployment status
+            # Show status
             docker-compose ps
-            echo "Checking container logs..."
-            docker-compose logs --tail=20 
+            docker-compose logs --tail=20
+            EONG 
