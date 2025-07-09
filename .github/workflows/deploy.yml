@@ -54,7 +54,7 @@ jobs:
           SMS_API_URL=${{ secrets.SMS_API_URL }}
           ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
           FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-          BACKEND_URL=${{ secrets.BACKEND_URL }}
+          REACT_APP_API_URL=${{ secrets.BACKEND_URL }}
           EOF
 
       - name: Copy files to Azure VM
