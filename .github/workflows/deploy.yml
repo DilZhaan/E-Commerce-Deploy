@@ -30,7 +30,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.AZURE_VM_IP }} >> ~/.ssh/known_hosts
 
-      - name: Create deployment directory and set permissions
+      - name: Create deployment directory
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.AZURE_VM_IP }}
@@ -38,32 +38,66 @@ jobs:
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
             mkdir -p ~/ecommerce-deploy
-            sudo usermod -aG docker $USER
             sudo chown -R $USER:$USER ~/ecommerce-deploy
+
+      - name: Debug - Print Secrets Format
+        run: |
+          echo "Checking MONGODB_URI format (first 10 chars): ${MONGODB_URI:0:10}..."
+          echo "Checking ALLOWED_ORIGINS format: $ALLOWED_ORIGINS"
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
 
       - name: Create .env file
         run: |
-          cat << 'EOF' > .env
-          BACKEND_IMAGE=dilzhan/ecommerce-backend:${{ github.event.inputs.backend_tag || 'latest' }}
-          FRONTEND_IMAGE=dilzhan/ecommerce-frontend:${{ github.event.inputs.frontend_tag || 'latest' }}
-          MONGODB_URI=${{ secrets.MONGODB_URI }}
-          TOKEN_SECRET_KEY=${{ secrets.TOKEN_SECRET_KEY }}
-          TOKEN_EXPIRY=${{ secrets.TOKEN_EXPIRY }}
-          SMS_CONTACT_LIST_ID=${{ secrets.SMS_CONTACT_LIST_ID }}
-          SMS_API_TOKEN=${{ secrets.SMS_API_TOKEN }}
-          SMS_API_URL=${{ secrets.SMS_API_URL }}
-          ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
-          FRONTEND_URL=${{ secrets.FRONTEND_URL }}
-          BACKEND_URL=${{ secrets.BACKEND_URL }}
-          EOF
+          # Create each line separately to better handle special characters
+          echo "BACKEND_IMAGE=dilzhan/ecommerce-backend:${BACKEND_TAG}" > .env
+          echo "FRONTEND_IMAGE=dilzhan/ecommerce-frontend:${FRONTEND_TAG}" >> .env
+          echo "MONGODB_URI='${MONGODB_URI}'" >> .env
+          echo "TOKEN_SECRET_KEY='${TOKEN_SECRET_KEY}'" >> .env
+          echo "TOKEN_EXPIRY='${TOKEN_EXPIRY}'" >> .env
+          echo "SMS_CONTACT_LIST_ID='${SMS_CONTACT_LIST_ID}'" >> .env
+          echo "SMS_API_TOKEN='${SMS_API_TOKEN}'" >> .env
+          echo "SMS_API_URL='${SMS_API_URL}'" >> .env
+          echo "ALLOWED_ORIGINS='${ALLOWED_ORIGINS}'" >> .env
+          echo "FRONTEND_URL='${FRONTEND_URL}'" >> .env
+          echo "BACKEND_URL='${BACKEND_URL}'" >> .env
+          
+          # Debug - Print the .env file content (excluding sensitive values)
+          echo "Generated .env file structure:"
+          cat .env | sed 's/=.*/=****/'
+        env:
+          BACKEND_TAG: ${{ github.event.inputs.backend_tag || 'latest' }}
+          FRONTEND_TAG: ${{ github.event.inputs.frontend_tag || 'latest' }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          TOKEN_SECRET_KEY: ${{ secrets.TOKEN_SECRET_KEY }}
+          TOKEN_EXPIRY: ${{ secrets.TOKEN_EXPIRY }}
+          SMS_CONTACT_LIST_ID: ${{ secrets.SMS_CONTACT_LIST_ID }}
+          SMS_API_TOKEN: ${{ secrets.SMS_API_TOKEN }}
+          SMS_API_URL: ${{ secrets.SMS_API_URL }}
+          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+          FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
 
-      - name: Copy files to Azure VM
+      - name: Copy files and set permissions
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.AZURE_VM_IP }}
+          username: ${{ secrets.AZURE_VM_USERNAME }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script: |
+            # Ensure docker group exists and add user to it
+            sudo groupadd -f docker
+            sudo usermod -aG docker $USER
+            # Set proper permissions
+            sudo chown -R $USER:$USER ~/ecommerce-deploy
+            sudo chmod 600 ~/ecommerce-deploy/.env
+
+      - name: Copy deployment files
         run: |
-          # Ensure proper line endings
-          sed -i 's/\r$//' .env
           scp -o StrictHostKeyChecking=no docker-compose.yml .env ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }}:~/ecommerce-deploy/
 
-      - name: Deploy on Azure VM
+      - name: Deploy
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.AZURE_VM_IP }}
@@ -71,25 +105,17 @@ jobs:
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
             cd ~/ecommerce-deploy
-            # Fix any potential line ending issues
-            sed -i 's/\r$//' .env
-            # Ensure docker permissions
+            # Ensure proper permissions
+            sudo chmod 600 .env
+            # Restart docker to ensure group changes take effect
             sudo systemctl restart docker
-            # Pull and restart containers
+            # Wait for Docker to be ready
+            sleep 5
+            # Deploy
             sudo docker-compose pull
             sudo docker-compose down --remove-orphans
-            sudo docker system prune -af
+            sudo docker system prune -af --force
             sudo docker-compose up -d
-
-      - name: Verify Deployment
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.AZURE_VM_IP }}
-          username: ${{ secrets.AZURE_VM_USERNAME }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          script: |
-            cd ~/ecommerce-deploy
-            # Check if containers are running
+            # Show deployment status
             sudo docker-compose ps
-            # Check container logs for any immediate errors
-            sudo docker-compose logs --tail=50 
+            sudo docker-compose logs --tail=20 
