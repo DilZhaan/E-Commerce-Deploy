@@ -30,7 +30,7 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE:-dilzhan/ecommerce-frontend:latest}
     ports:
-      - "3000:3000"
+      - "3000:80"
     environment:
       - NODE_ENV=development
     depends_on:
