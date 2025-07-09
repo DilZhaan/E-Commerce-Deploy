@@ -30,11 +30,22 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.AZURE_VM_IP }} >> ~/.ssh/known_hosts
 
+      - name: Create deployment directory and set permissions
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.AZURE_VM_IP }}
+          username: ${{ secrets.AZURE_VM_USERNAME }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script: |
+            mkdir -p ~/ecommerce-deploy
+            sudo usermod -aG docker $USER
+            sudo chown -R $USER:$USER ~/ecommerce-deploy
+
       - name: Create .env file
         run: |
-          cat << EOF > .env
-          BACKEND_IMAGE=your-dockerhub-username/ecommerce-backend:${{ github.event.inputs.backend_tag || 'latest' }}
-          FRONTEND_IMAGE=your-dockerhub-username/ecommerce-frontend:${{ github.event.inputs.frontend_tag || 'latest' }}
+          cat << 'EOF' > .env
+          BACKEND_IMAGE=dilzhan/ecommerce-backend:${{ github.event.inputs.backend_tag || 'latest' }}
+          FRONTEND_IMAGE=dilzhan/ecommerce-frontend:${{ github.event.inputs.frontend_tag || 'latest' }}
           MONGODB_URI=${{ secrets.MONGODB_URI }}
           TOKEN_SECRET_KEY=${{ secrets.TOKEN_SECRET_KEY }}
           TOKEN_EXPIRY=${{ secrets.TOKEN_EXPIRY }}
@@ -48,8 +59,9 @@ jobs:
 
       - name: Copy files to Azure VM
         run: |
-          ssh ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }} 'mkdir -p ~/ecommerce-deploy'
-          scp docker-compose.yml .env ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }}:~/ecommerce-deploy/
+          # Ensure proper line endings
+          sed -i 's/\r$//' .env
+          scp -o StrictHostKeyChecking=no docker-compose.yml .env ${{ secrets.AZURE_VM_USERNAME }}@${{ secrets.AZURE_VM_IP }}:~/ecommerce-deploy/
 
       - name: Deploy on Azure VM
         uses: appleboy/ssh-action@master
@@ -59,7 +71,25 @@ jobs:
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
             cd ~/ecommerce-deploy
-            docker-compose pull
-            docker-compose down --remove-orphans
-            docker system prune -af
-            docker-compose up -d 
+            # Fix any potential line ending issues
+            sed -i 's/\r$//' .env
+            # Ensure docker permissions
+            sudo systemctl restart docker
+            # Pull and restart containers
+            sudo docker-compose pull
+            sudo docker-compose down --remove-orphans
+            sudo docker system prune -af
+            sudo docker-compose up -d
+
+      - name: Verify Deployment
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.AZURE_VM_IP }}
+          username: ${{ secrets.AZURE_VM_USERNAME }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          script: |
+            cd ~/ecommerce-deploy
+            # Check if containers are running
+            sudo docker-compose ps
+            # Check container logs for any immediate errors
+            sudo docker-compose logs --tail=50 
