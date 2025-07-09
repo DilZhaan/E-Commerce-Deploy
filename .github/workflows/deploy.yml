@@ -32,7 +32,6 @@ jobs:
 
       - name: Create .env file
         run: |
-          # Create each line separately without quotes to avoid parsing issues
           {
             echo "BACKEND_IMAGE=dilzhan/ecommerce-backend:${BACKEND_TAG}"
             echo "FRONTEND_IMAGE=dilzhan/ecommerce-frontend:${FRONTEND_TAG}"
@@ -47,7 +46,6 @@ jobs:
             echo "BACKEND_URL=${BACKEND_URL}"
           } > .env
           
-          # Debug - Print the .env file structure (without values)
           echo "Generated .env file structure:"
           cat .env | sed 's/=.*/=****/'
         env:
@@ -70,12 +68,17 @@ jobs:
           username: ${{ secrets.AZURE_VM_USERNAME }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
-            # Create deployment directory if it doesn't exist
+            # Create deployment directory
             mkdir -p ~/ecommerce-deploy
+            
             # Fix Docker permissions
-            sudo groupadd -f docker
+            if ! getent group docker > /dev/null 2>&1; then
+              sudo groupadd docker
+            fi
             sudo usermod -aG docker $USER
-            sudo systemctl restart docker
+            sudo chown root:docker /var/run/docker.sock
+            sudo chmod 666 /var/run/docker.sock
+            
             # Clear existing files
             rm -f ~/ecommerce-deploy/.env
             rm -f ~/ecommerce-deploy/docker-compose.yml
@@ -91,22 +94,29 @@ jobs:
           username: ${{ secrets.AZURE_VM_USERNAME }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
-            # Ensure proper permissions
+            # Set proper permissions
             sudo chown -R $USER:$USER ~/ecommerce-deploy
             sudo chmod 644 ~/ecommerce-deploy/.env
             sudo chmod 644 ~/ecommerce-deploy/docker-compose.yml
             
-            # Wait for Docker to be ready
-            sleep 5
+            # Ensure Docker socket permissions
+            sudo chmod 666 /var/run/docker.sock
             
-            # Deploy using sudo for Docker commands
+            # Change to deployment directory
             cd ~/ecommerce-deploy
-            sudo -E docker-compose pull
-            sudo -E docker-compose down --remove-orphans
-            sudo -E docker system prune -af --volumes --force
-            sudo -E docker-compose up -d
+            
+            # Stop and remove existing containers
+            docker-compose down --remove-orphans || true
+            
+            # Remove unused Docker resources
+            docker system prune -af --volumes --force || true
+            
+            # Pull and start containers
+            docker login -u dilzhan
+            docker-compose pull
+            docker-compose up -d
             
             # Show deployment status
-            sudo docker-compose ps
+            docker-compose ps
             echo "Checking container logs..."
-            sudo docker-compose logs --tail=20 
+            docker-compose logs --tail=20 
