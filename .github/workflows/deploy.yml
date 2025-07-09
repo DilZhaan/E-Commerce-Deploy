@@ -55,6 +55,7 @@ jobs:
           ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
           FRONTEND_URL=${{ secrets.FRONTEND_URL }}
           REACT_APP_API_URL=${{ secrets.BACKEND_URL }}
+          COOKIE_DOMAIN=${{ secrets.COOKIE_DOMAIN }}
           EOF
 
       - name: Copy files to Azure VM
