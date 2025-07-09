@@ -28,11 +28,14 @@ services:
 
   frontend:
     image: ${FRONTEND_IMAGE:-dilzhan/ecommerce-frontend:latest}
+    build:
+      context: ./E-Commerce-Sys-FrontEnd-MERN
+      args:
+        - REACT_APP_API_URL=${BACKEND_URL}
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - REACT_APP_API_URL=${BACKEND_URL:-http://localhost:5000}
     depends_on:
       - backend
     restart: unless-stopped
