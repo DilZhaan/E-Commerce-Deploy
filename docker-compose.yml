@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   backend:
-    image: ${BACKEND_IMAGE:-your-dockerhub-username/ecommerce-backend:latest}
+    image: ${BACKEND_IMAGE:-dilzhan/ecommerce-backend:latest}
     ports:
       - "5000:5000"
     environment:
@@ -27,7 +27,7 @@ services:
       retries: 3
 
   frontend:
-    image: ${FRONTEND_IMAGE:-your-dockerhub-username/ecommerce-frontend:latest}
+    image: ${FRONTEND_IMAGE:-dilzhan/ecommerce-frontend:latest}
     ports:
       - "3000:3000"
     environment:
