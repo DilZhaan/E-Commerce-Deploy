@@ -30,40 +30,24 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.AZURE_VM_IP }} >> ~/.ssh/known_hosts
 
-      - name: Create deployment directory
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.AZURE_VM_IP }}
-          username: ${{ secrets.AZURE_VM_USERNAME }}
-          key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          script: |
-            mkdir -p ~/ecommerce-deploy
-            sudo chown -R $USER:$USER ~/ecommerce-deploy
-
-      - name: Debug - Print Secrets Format
-        run: |
-          echo "Checking MONGODB_URI format (first 10 chars): ${MONGODB_URI:0:10}..."
-          echo "Checking ALLOWED_ORIGINS format: $ALLOWED_ORIGINS"
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
-          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
-
       - name: Create .env file
         run: |
-          # Create each line separately to better handle special characters
-          echo "BACKEND_IMAGE=dilzhan/ecommerce-backend:${BACKEND_TAG}" > .env
-          echo "FRONTEND_IMAGE=dilzhan/ecommerce-frontend:${FRONTEND_TAG}" >> .env
-          echo "MONGODB_URI='${MONGODB_URI}'" >> .env
-          echo "TOKEN_SECRET_KEY='${TOKEN_SECRET_KEY}'" >> .env
-          echo "TOKEN_EXPIRY='${TOKEN_EXPIRY}'" >> .env
-          echo "SMS_CONTACT_LIST_ID='${SMS_CONTACT_LIST_ID}'" >> .env
-          echo "SMS_API_TOKEN='${SMS_API_TOKEN}'" >> .env
-          echo "SMS_API_URL='${SMS_API_URL}'" >> .env
-          echo "ALLOWED_ORIGINS='${ALLOWED_ORIGINS}'" >> .env
-          echo "FRONTEND_URL='${FRONTEND_URL}'" >> .env
-          echo "BACKEND_URL='${BACKEND_URL}'" >> .env
+          # Create each line separately without quotes to avoid parsing issues
+          {
+            echo "BACKEND_IMAGE=dilzhan/ecommerce-backend:${BACKEND_TAG}"
+            echo "FRONTEND_IMAGE=dilzhan/ecommerce-frontend:${FRONTEND_TAG}"
+            echo "MONGODB_URI=${MONGODB_URI}"
+            echo "TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY}"
+            echo "TOKEN_EXPIRY=${TOKEN_EXPIRY}"
+            echo "SMS_CONTACT_LIST_ID=${SMS_CONTACT_LIST_ID}"
+            echo "SMS_API_TOKEN=${SMS_API_TOKEN}"
+            echo "SMS_API_URL=${SMS_API_URL}"
+            echo "ALLOWED_ORIGINS=${ALLOWED_ORIGINS}"
+            echo "FRONTEND_URL=${FRONTEND_URL}"
+            echo "BACKEND_URL=${BACKEND_URL}"
+          } > .env
           
-          # Debug - Print the .env file content (excluding sensitive values)
+          # Debug - Print the .env file structure (without values)
           echo "Generated .env file structure:"
           cat .env | sed 's/=.*/=****/'
         env:
@@ -79,19 +63,22 @@ jobs:
           FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
           BACKEND_URL: ${{ secrets.BACKEND_URL }}
 
-      - name: Copy files and set permissions
+      - name: Setup remote environment
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.AZURE_VM_IP }}
           username: ${{ secrets.AZURE_VM_USERNAME }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
-            # Ensure docker group exists and add user to it
+            # Create deployment directory if it doesn't exist
+            mkdir -p ~/ecommerce-deploy
+            # Fix Docker permissions
             sudo groupadd -f docker
             sudo usermod -aG docker $USER
-            # Set proper permissions
-            sudo chown -R $USER:$USER ~/ecommerce-deploy
-            sudo chmod 600 ~/ecommerce-deploy/.env
+            sudo systemctl restart docker
+            # Clear existing files
+            rm -f ~/ecommerce-deploy/.env
+            rm -f ~/ecommerce-deploy/docker-compose.yml
 
       - name: Copy deployment files
         run: |
@@ -104,18 +91,22 @@ jobs:
           username: ${{ secrets.AZURE_VM_USERNAME }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
           script: |
-            cd ~/ecommerce-deploy
             # Ensure proper permissions
-            sudo chmod 600 .env
-            # Restart docker to ensure group changes take effect
-            sudo systemctl restart docker
+            sudo chown -R $USER:$USER ~/ecommerce-deploy
+            sudo chmod 644 ~/ecommerce-deploy/.env
+            sudo chmod 644 ~/ecommerce-deploy/docker-compose.yml
+            
             # Wait for Docker to be ready
             sleep 5
-            # Deploy
-            sudo docker-compose pull
-            sudo docker-compose down --remove-orphans
-            sudo docker system prune -af --force
-            sudo docker-compose up -d
+            
+            # Deploy using sudo for Docker commands
+            cd ~/ecommerce-deploy
+            sudo -E docker-compose pull
+            sudo -E docker-compose down --remove-orphans
+            sudo -E docker system prune -af --volumes --force
+            sudo -E docker-compose up -d
+            
             # Show deployment status
             sudo docker-compose ps
+            echo "Checking container logs..."
             sudo docker-compose logs --tail=20 
