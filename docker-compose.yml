@@ -29,8 +29,8 @@ services:
 
   frontend:
     image: ${FRONTEND_IMAGE:-dilzhan/ecommerce-frontend:latest}
-    ports:
-      - "127.0.0.1:3000:3000"  # Only allow local access
+    volumes:
+      - frontend_build:/app/build
     environment:
       - NODE_ENV=development
     depends_on:
@@ -39,3 +39,4 @@ services:
 
 volumes:
   backend_uploads:
+  frontend_build:
