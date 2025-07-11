@@ -29,8 +29,8 @@ services:
 
   frontend:
     image: ${FRONTEND_IMAGE:-dilzhan/ecommerce-frontend:latest}
-    volumes:
-      - /var/www/ecommerce/frontend:/app/build
+    ports:
+      - "80:80"  # Expose directly on port 80
     environment:
       - NODE_ENV=development
     depends_on:
