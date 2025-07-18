@@ -30,15 +30,12 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE:-dilzhan/ecommerce-frontend:latest}
     ports:
-      - "80:80"  # Expose directly on port 80
-    environment:
-      - NODE_ENV=development
-      - REACT_APP_API_URL=http://localhost:5000  # Explicitly set API URL
+      - "3000:3000"  # Expose directly on port 3000
     depends_on:
       - backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
