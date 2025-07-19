@@ -56,6 +56,9 @@ jobs:
           FRONTEND_URL=${{ secrets.FRONTEND_URL }}
           REACT_APP_API_URL=${{ secrets.BACKEND_URL }}
           COOKIE_DOMAIN=${{ secrets.COOKIE_DOMAIN }}
+          CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}
+          CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
           EOF
 
       - name: Copy files to Azure VM
