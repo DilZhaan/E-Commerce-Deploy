@@ -18,6 +18,9 @@ services:
       - SMS_API_URL=${SMS_API_URL}
       - TOKEN_SECRET_KEY=${TOKEN_SECRET_KEY}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
     volumes:
       - backend_uploads:/app/public/uploads
     restart: unless-stopped
