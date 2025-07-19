@@ -30,12 +30,12 @@ services:
   frontend:
     image: ${FRONTEND_IMAGE:-dilzhan/ecommerce-frontend:latest}
     ports:
-      - "80:3000"  # Expose directly on port 3000
+      - "80:80"  # Now mapping to internal port 80
     depends_on:
       - backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
       interval: 30s
       timeout: 10s
       retries: 3
