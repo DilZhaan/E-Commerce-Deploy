@@ -4,7 +4,7 @@ services:
   backend:
     image: ${BACKEND_IMAGE:-dilzhan/ecommerce-backend:latest}
     ports:
-      - "127.0.0.1:5000:5000"  # Only allow local access
+      - "5000:5000"
     environment:
       - NODE_ENV=development
       - MONGODB_URI=${MONGODB_URI}
